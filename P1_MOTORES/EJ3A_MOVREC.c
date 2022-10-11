@@ -6,7 +6,6 @@
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
 #include "driverlib/pin_map.h" 
-// Libreria de control del sistema
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h" // NHR: Libreria GPIO
 #include "driverlib/pwm.h"  // NHR: Libreria PWM
@@ -16,21 +15,7 @@
 #include "inc/hw_ints.h" // NHR
 
 
-//#define PERIOD_PWM 12500
-//#define ADELANTE_DRC 800       //AJUSTAR ENCODER
-//#define ATRAS_DRC 1095       // AJUSTAR ENCODER
-//#define PARADA_DRC 940
-//#define PARADA_DRC 975       // 990 REAL
-//#define CYCLE_ INCREMENTS 35    // Pasos/pulsacion boton
-//#define CYCLE_ INCREMENTS 30
-//#define ADELANTE_IZQ 1100      // 1095 REAL  AJUSTAR ENCODER
-//#define ATRAS_IZQ 840       // AJUSTAR ENCODER
-//#define PARADA_IZQ 960
-//#define PARADA_IZQ 1000
-//#define CYCLE_ INCREMENTS 30
-//#define CYCLE_ INCREMENTS 25
-
-#define PERIOD_PWM 50000    // TODO: Ciclos de reloj para conseguir una señal periódica de 50Hz (según reloj de periférico usado)
+#define PERIOD_PWM 50000    // TODO: Ciclos de reloj para conseguir una seÃ±al periÃ³dica de 50Hz (segÃºn reloj de perifÃ©rico usado)
 #define NUM_STEPS 50    // Pasos para cambiar entre el pulso de 2ms al de 1ms
 #define CYCLE_INCREMENTS (abs(ADELANTE_DRC-ADELANTE_IZQ))/NUM_STEPS  // Variacion de amplitud tras pulsacion
 
@@ -58,7 +43,7 @@ void ConfigTimer(void);
 
 int main(void){
 
-    // Elegir reloj adecuado para los valores de ciclos sean de tamaño soportable
+    // Elegir reloj adecuado para los valores de ciclos sean de tamaÃ±o soportable
     SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);  //200MHz/5 = 40MHz
 
     ConfigButtons();
@@ -82,7 +67,7 @@ void ConfigButtons(void){
 
 void ConfigServos(void){
 
-    // Habilita puerto salida para señal PWM (ver en documentacion que pin se corresponde a cada módulo PWM)
+    // Habilita puerto salida para seÃ±al PWM (ver en documentacion que pin se corresponde a cada mÃ³dulo PWM)
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     //Habilita modulo PWM
     SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM1);
@@ -95,10 +80,10 @@ void ConfigServos(void){
     GPIOPinConfigure(GPIO_PF3_M1PWM7);
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_3);
     //Configura el modo de funcionamiento del PWM
-    PWMGenConfigure(PWM1_BASE, PWM_GEN_3, PWM_GEN_MODE_DOWN);   // Módulo PWM contara hacia abajo
-    PWMOutputState(PWM1_BASE, PWM_OUT_6_BIT, true);             // Habilita la salida de la señal
-    PWMOutputState(PWM1_BASE, PWM_OUT_7_BIT, true);             // Habilita la salida de la señal
-    PWMGenPeriodSet(PWM1_BASE, PWM_GEN_3, PERIOD_PWM);            // Carga la cuenta que establece la frecuencia de la señal PWM
+    PWMGenConfigure(PWM1_BASE, PWM_GEN_3, PWM_GEN_MODE_DOWN);   // MÃ³dulo PWM contara hacia abajo
+    PWMOutputState(PWM1_BASE, PWM_OUT_6_BIT, true);             // Habilita la salida de la seÃ±al
+    PWMOutputState(PWM1_BASE, PWM_OUT_7_BIT, true);             // Habilita la salida de la seÃ±al
+    PWMGenPeriodSet(PWM1_BASE, PWM_GEN_3, PERIOD_PWM);            // Carga la cuenta que establece la frecuencia de la seÃ±al PWM
     PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, PARADA_DRC);
     PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, PARADA_IZQ);
     PWMGenEnable(PWM1_BASE, PWM_GEN_3);
@@ -128,7 +113,7 @@ void ConfigTimer(void){
 }
 
 
-// Rutinas de interrupción de pulsadores
+// Rutinas de interrupciÃ³n de pulsadores
 // Boton Izquierdo: modifica  ciclo de trabajo en CYCLE_INCREMENTS para el servo conectado a PF2, hasta llegar a  COUNT_1MS
 // Boton Derecho: modifica  ciclo de trabajo en CYCLE_INCREMENTS para el servo conectado a PF2, hasta llegar a COUNT_2MS
 void GPIOFIntHandler(void)
