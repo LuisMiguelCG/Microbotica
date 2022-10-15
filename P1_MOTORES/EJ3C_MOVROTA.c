@@ -21,14 +21,14 @@
 
 
 //Rueda Derecha       PWM_OUT_6
-#define ADELANTE_DRC            2500
-#define ATRAS_DRC               5000
+#define ADELANTE_DRC            3550                //2500
+#define ATRAS_DRC               4100                //5000
 #define PARADA_DRC              3850
 #define V_MEDIA_DRC     (PARADA_DRC - (PARADA_DRC - ADELANTE_DRC)*0.5)
 
 //Rueda Izquierda     PWM_OUT_7
-#define ADELANTE_IZQ            5000
-#define ATRAS_IZQ               2500
+#define ADELANTE_IZQ            4100                //5000
+#define ATRAS_IZQ               3550                //2500
 #define PARADA_IZQ              3850
 #define V_MEDIA_IZQ     (PARADA_IZQ + (ADELANTE_IZQ - PARADA_IZQ)*0.5)
 

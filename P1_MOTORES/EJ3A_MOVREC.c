@@ -20,15 +20,17 @@
 #define CYCLE_INCREMENTS (abs(ADELANTE_DRC-ADELANTE_IZQ))/NUM_STEPS  // Variacion de amplitud tras pulsacion
 
 
-//Rueda Derecha
-#define ADELANTE_DRC            2500
-#define ATRAS_DRC               5000
+//Rueda Derecha       PWM_OUT_6
+#define ADELANTE_DRC            3550                //2500
+#define ATRAS_DRC               4100                //5000
 #define PARADA_DRC              3850
+#define V_MEDIA_DRC     (PARADA_DRC - (PARADA_DRC - ADELANTE_DRC)*0.5)
 
-//Rueda Izquierda
-#define ADELANTE_IZQ            5000
-#define ATRAS_IZQ               2500
+//Rueda Izquierda     PWM_OUT_7
+#define ADELANTE_IZQ            4100                //5000
+#define ATRAS_IZQ               3550                //2500
 #define PARADA_IZQ              3850
+#define V_MEDIA_IZQ     (PARADA_IZQ + (ADELANTE_IZQ - PARADA_IZQ)*0.5)
 
 
 #define PARADA 0
