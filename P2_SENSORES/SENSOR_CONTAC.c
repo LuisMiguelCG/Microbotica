@@ -1,13 +1,4 @@
-/*
- * main.c
- *
- *  Created on: 28 oct. 2021
- *      Author: Luis Miguel Campos Garcia
- */
-
-
 //Librerias
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -25,15 +16,17 @@
 #include "drivers/buttons.h"     // TIVA: Funciones API manejo de botones
 #include "drivers/rgb.h"         // TIVA: Funciones API manejo de RGB
 #include "driverlib/pwm.h"       // TIVA: Funciones API manejo PWM
+#include "driverlib/adc.h"       // TIVA: Funciones API manejo del ADC
 #include "driverlib/timer.h"     // TIVA: Funciones API manejo de Timers
 #include "FreeRTOS.h"            // FreeRTOS: definiciones generales
 #include "task.h"                // FreeRTOS: definiciones relacionadas con tareas
 #include "semphr.h"              // FreeRTOS: definiciones para uso de semaforos
 #include "queue.h"               // FreeRTOS: definiciones para uso de ola de mensajes
 #include "Configuracion.h"       // Configuracion de perifericos
+#include "drivers/configADC.h"   // Configuracion del adc
 #include "commands.h"
 #include "utils/cpu_usage.h"
-#include "usb_dev_serial.h"
+
 
 //Defines
 
@@ -46,6 +39,9 @@
 
 uint32_t g_ui32CPUUsage;
 uint32_t g_ui32SystemClock;
+uint8_t estado = PARADA;
+
+
 
 //Importante: Los arrays con los parametros tengo que poner como globales !!!
 // por que? se pasan por referencia a la funcion TaskCreate,
@@ -56,7 +52,9 @@ uint32_t g_ui32SystemClock;
 
 //Variables globales tareas e interrupciones
 
-xSemaphoreHandle semaforo_choque;
+xSemaphoreHandle semaforo_motor;
+xSemaphoreHandle semaforo_adc;
+
 
 //*****************************************************************************
 //
@@ -120,36 +118,101 @@ void vApplicationMallocFailedHook (void)
 //
 //*****************************************************************************
 
-static portTASK_FUNCTION(ChoqueTask, pvParameters ){
+///////////////////////////////////////////// TAREA ENCARGADA DE CONTROLAR LOS MOTORES ////////////////////////////////////////////////////////////
 
-    //xSemaphoreTake(semaforo_choque,0);   //Nos aseguramos de que el semaforo esta cerrado
+static portTASK_FUNCTION(MotorTask, pvParameters ){
+
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_PWM1);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER2);
 
         //
         // Loop forever.
         //
         while(1)
         {
-            xSemaphoreTake(semaforo_choque,portMAX_DELAY); //Semaforo del RTOS
+            xSemaphoreTake(semaforo_motor,portMAX_DELAY); //Semaforo del RTOS
 
-            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, COUNT_ATRAS_DRC);
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, COUNT_ATRAS_IZQ);
+            TimerEnable(TIMER2_BASE, TIMER_A);
 
-            vTaskDelay(configTICK_RATE_HZ*0.5);
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, ATRAS_DRC);             // Carga valor al servo derecho
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, ATRAS_IZQ);
 
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, COUNT_ATRAS_DRC);
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, COUNT_ADELANTE_IZQ);
 
-            vTaskDelay(configTICK_RATE_HZ*0.5);
+            xSemaphoreTake(semaforo_motor,portMAX_DELAY); //Semaforo del RTOS
 
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, V_MEDIA_ADELANTE_DRC);
-            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, V_MEDIA_ADELANTE_IZQ);
-            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, ATRAS_DRC);             // Carga valor al servo derecho
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, ADELANTE_IZQ);
+
+            xSemaphoreTake(semaforo_motor,portMAX_DELAY); //Semaforo del RTOS
+
+
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, ADELANTE_DRC);             // Carga valor al servo derecho
+            PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, ADELANTE_IZQ);
+
+            estado = PARADA;
+            TimerDisable(TIMER2_BASE, TIMER_A);
+           // GPIOIntEnable(GPIO_PORTB_BASE,SENSOR_CONTAC);
 
 
         }
 }
+
+////////////////////////////////TAREA ENCARGADA DE RECOGER MUESTRAS DEL ADC Y CAMBIAR ESTADO EN FUNCION A ELLAS ///////////////////////////////////
+
+//static portTASK_FUNCTION(ADCTask,pvParameters)
+//{
+//    uint16_t Valor_SenM, Valor_SenL;
+//
+//    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_PWM1);
+//    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOB);
+//    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER0);
+//    //
+//    // Bucle infinito, las tareas en FreeRTOS no pueden "acabar", deben "matarse" con la funcion xTaskDelete().
+//    //
+//    while(1)
+//    {
+//        xSemaphoreTake(semaforo_adc, portMAX_DELAY);
+//
+////                                           SENSOR DE ABAJO PARA BUSCAR OBJETOS
+//
+//        if(ESTADO_SENSOR == SENSORM){
+//
+//            configADC_DisparaSensorM();                         //Dispara ADC
+//            configADC_LeeSensorM(&Valor_SenM);                  //Recoge muestras del ADC
+//
+//            if(ESTADO_MOTOR == BUSQUEDA){                       //Buscando el objeto
+//
+//                if(Valor_SenM < 1278 && Valor_SenM > 289){       //Si lo encuentra
+//
+//                    ESTADO_MOTOR = AVANCE_OR;                   //Motores pasan a estado avanzar hacia objeto
+//                    GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
+//
+//                    MB = 0;                                                     //reseteo el movimiento de busqueda
+//                    TimerDisable(TIMER2_BASE, TIMER_A);                         //
+////                    TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet() -1);    //
+//
+//                    xSemaphoreGive(semaforo_motor);             //Despierto motores
+//                }
+//            }
+//            else if(ESTADO_MOTOR == AVANCE || ESTADO_MOTOR == AVANCE_OR){   //Avanzando hacia objeto o solo avanzando
+//
+//                if(!(Valor_SenM < 1278 && Valor_SenM > 289)){                //Si lo pierde de vista
+//
+//                    ESTADO_MOTOR = BUSQUEDA;                                //Motores pasan a estado de busqueda
+//
+//
+//                    GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+//                    TimerEnable(TIMER2_BASE, TIMER_A);                      //Activo movimiento de busqueda
+//
+//                    xSemaphoreGive(semaforo_motor);                         //Despierto motores
+//                }
+//
+//            }
+//        }
+//    }
+//}
+
+
 
 
 //*****************************************************************************
@@ -158,7 +221,7 @@ static portTASK_FUNCTION(ChoqueTask, pvParameters ){
 //
 //*****************************************************************************
 int main(void)
-{
+ {
 
     //
     // Set the clocking to run at 40 MHz from the PLL.
@@ -166,10 +229,10 @@ int main(void)
     MAP_SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ |
             SYSCTL_OSC_MAIN);
 
+    Configuracion();
 
-    ConfigButtons();
-    ConfigServos();
-    ConfigEncSFrontal();
+    configADC_IniciaSensorML();   //Configura el adc
+
 
 
     // Get the system clock speed.
@@ -184,18 +247,32 @@ int main(void)
     // El timer 0 y 1 se utilizan para los LEDS
     CPUUsageInit(g_ui32SystemClock, configTICK_RATE_HZ/10, 3);
 
-
-    if(xTaskCreate(ChoqueTask, "Choque", 512, NULL, tskIDLE_PRIORITY + 2, NULL) != pdTRUE){
+    //Crea la tarea que maneja el choque
+    if(xTaskCreate(MotorTask, "Choque", 512, NULL, tskIDLE_PRIORITY + 2, NULL) != pdTRUE){
 
         while(1);
     }
 
+    //Crea la tarea del ADC
+//    if((xTaskCreate(ADCTask, (portCHAR *)"ADC", 256, NULL, tskIDLE_PRIORITY + 1, NULL) != pdTRUE)){
+//
+//        while(1);
+//
+//    }
+
     //Crea los semaforos compartidos por tareas e ISR
-     semaforo_choque=xSemaphoreCreateBinary();
-     if ((semaforo_choque==NULL))
+     semaforo_motor=xSemaphoreCreateBinary();
+     if ((semaforo_motor==NULL))
      {
          while (1);  //No hay memoria para los semaforo
      }
+
+     semaforo_adc=xSemaphoreCreateBinary();
+      if ((semaforo_adc==NULL))
+      {
+          while (1);  //No hay memoria para los semaforo
+      }
+
 
     //
     // Start the scheduler.  This should not return.
@@ -218,64 +295,86 @@ void INT_SENSOR_BUTTON(void){
 
 
     BaseType_t higherPriorityTaskWoken=pdFALSE;
-    int32_t i32Status = GPIOIntStatus(GPIO_PORTB_BASE, SENSOR_FRONTAL);
+    int32_t i32Status = GPIOIntStatus(GPIO_PORTB_BASE, SENSOR_CONTAC);
 
-    if(((i32Status & SENSOR_FRONTAL) == SENSOR_FRONTAL)){
+    if(((i32Status & SENSOR_CONTAC) == SENSOR_CONTAC)){  //Int del sensor contacto
 
-        xSemaphoreGiveFromISR(semaforo_choque,&higherPriorityTaskWoken);
+        //GPIOIntDisable(GPIO_PORTB_BASE,SENSOR_CONTAC);
+
+        estado = CHOQUE;
+
+        xSemaphoreGiveFromISR(semaforo_motor,&higherPriorityTaskWoken);
+
+        // Encender LED ROJO
+
+        // Activar un timer que haga un movimiento marcha atras, dos ruedas para atras y luego una disminuyendo velocidad, asi girará
+
+        //O que active una tarea que lo haga
 
     }
 
-    GPIOIntClear(GPIO_PORTB_BASE, SENSOR_FRONTAL);
+
+
+    GPIOIntClear(GPIO_PORTB_BASE, SENSOR_CONTAC);
 
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 
 }
 
-void STOP_MOVE(void){
+//void STOP_MOVE(void){
+//
+//    BaseType_t higherPriorityTaskWoken=pdFALSE;
+//    int32_t i32Status = GPIOIntStatus(GPIO_PORTF_BASE,ALL_BUTTONS);
+//
+//    if(((i32Status & LEFT_BUTTON) == LEFT_BUTTON)){
+//
+//        if(ESTADO_MOTOR == PARADA){
+//
+//            ESTADO_MOTOR = AVANCE;
+// //           TimerEnable(TIMER2_BASE, TIMER_A);
+////            TimerEnable(TIMER0_BASE, TIMER_A);
+//        }
+//        else{
+//
+//            ESTADO_MOTOR = PARADA;
+//            TimerDisable(TIMER2_BASE, TIMER_A);
+////            TimerDisable(TIMER0_BASE, TIMER_A);
+//            MB = 0;                                                     //reseteo el movimiento de busqueda
+//            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet() -1);
+//        }
+//    }
+//
+//    xSemaphoreGiveFromISR(semaforo_motor,&higherPriorityTaskWoken);
+//
+//    GPIOIntClear(GPIO_PORTF_BASE,ALL_BUTTONS);
+//}
 
-    int32_t i32Status = GPIOIntStatus(GPIO_PORTF_BASE,ALL_BUTTONS);
 
-    if(((i32Status & LEFT_BUTTON) == LEFT_BUTTON)){
+void PERIOD_TIMER_ADC(void){
 
-        PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, STOPCOUNT_DRC_MIN);
-        PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, STOPCOUNT_IZQ_MAX);
-    }
+    BaseType_t higherPriorityTaskWoken=pdFALSE;
 
-    GPIOIntClear(GPIO_PORTF_BASE,ALL_BUTTONS);
+    xSemaphoreGiveFromISR(semaforo_adc, &higherPriorityTaskWoken);
+
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+
 }
 
+void PERIOD_TIMER2_A(void){
+
+    BaseType_t higherPriorityTaskWoken=pdFALSE;
+    //uint32_t ui32Period;
+
+    if(estado == CHOQUE )
+    {
+        xSemaphoreGiveFromISR(semaforo_motor, &higherPriorityTaskWoken);
+    }
 
 
+    TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
 
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}

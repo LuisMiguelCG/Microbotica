@@ -1,9 +1,3 @@
-/*
- * Configuracion.h
- *
- *  Created on: 28 oct. 2021
- *      Author: Luis Miguel Campos Garcia
- */
 
 #ifndef CONFIGURACION_H_
 #define CONFIGURACION_H_
@@ -20,147 +14,144 @@
 #include "driverlib/sysctl.h"    // TIVA: Funciones API control del sistema
 #include "driverlib/uart.h"      // TIVA: Funciones API manejo UART
 #include "driverlib/interrupt.h" // TIVA: Funciones API manejo de interrupciones
-#include "utils/uartstdioMod.h"     // TIVA: Funciones API UARTSTDIO (printf)
+//#include "utils/uartstdioMod.h"     // TIVA: Funciones API UARTSTDIO (printf)
 #include "drivers/buttons.h"     // TIVA: Funciones API manejo de botones
 #include "drivers/rgb.h"        // TIVA: Funciones API manejo de RGB
 #include "driverlib/pwm.h"       // TIVA: Funciones API manejo PWM
 #include "driverlib/timer.h"     // TIVA: Funciones API manejo de Timers
 
 
-#define PERIOD_PWM 12500
+#define PERIOD_PWM 50000    // TODO: Ciclos de reloj para conseguir una señal periódica de 50Hz (según reloj de periférico usado)
+#define NUM_STEPS 50    // Pasos para cambiar entre el pulso de 2ms al de 1ms
+#define CYCLE_INCREMENTS (abs(ADELANTE_DRC-ADELANTE_IZQ))/NUM_STEPS  // Variacion de amplitud tras pulsacion
 
-#define COUNT_ADELANTE_DRC      750       //AJUSTAR ENCODER
-#define COUNT_ATRAS_DRC         1065       // AJUSTAR ENCODER
-#define STOPCOUNT_DRC_MIN       930
-#define STOPCOUNT_DRC_MAX       975       // 990 REAL
-#define NUM_STEPS_DRC_ADELANTE  0.2*(STOPCOUNT_DRC_MIN - COUNT_ADELANTE_DRC)    // Pasos/pulsacion boton
-#define NUM_STEPS_DRC_ATRAS     0.2*(COUNT_ATRAS_DRC - STOPCOUNT_DRC_MAX)
-#define V_MEDIA_ADELANTE_DRC    (STOPCOUNT_DRC_MIN - 0.5*(STOPCOUNT_DRC_MIN - COUNT_ADELANTE_DRC))+25
-#define V_MEDIA_ATRAS_DRC       STOPCOUNT_DRC_MAX + 0.5*(COUNT_ATRAS_DRC - STOPCOUNT_DRC_MAX)
-#define COUNT_ADELANTE_IZQ      1095      // 1025 REAL  AJUSTAR ENCODER
-#define COUNT_ATRAS_IZQ         710       // AJUSTAR ENCODER
-#define STOPCOUNT_IZQ_MIN       945
-#define STOPCOUNT_IZQ_MAX       985
-#define NUM_STEPS_IZQ_ATRAS     0.2*(STOPCOUNT_IZQ_MIN - COUNT_ATRAS_IZQ)
-#define NUM_STEPS_IZQ_ADELANTE  0.2*(COUNT_ADELANTE_IZQ - STOPCOUNT_IZQ_MAX)
-#define V_MEDIA_ADELANTE_IZQ    STOPCOUNT_IZQ_MAX + 0.5*(COUNT_ADELANTE_IZQ - STOPCOUNT_IZQ_MAX)
-#define V_MEDIA_ATRAS_IZQ       (STOPCOUNT_IZQ_MIN - 0.5*(STOPCOUNT_IZQ_MIN - COUNT_ATRAS_IZQ))+45
 
-#define SENSOR_FRONTAL          GPIO_PIN_2
+//Rueda Derecha       PWM_OUT_6
+#define ADELANTE_DRC            3550                //2500
+#define ATRAS_DRC               4100                //5000
+#define PARADA_DRC              3850
+#define V_MEDIA_DRC     (PARADA_DRC - (PARADA_DRC - ADELANTE_DRC)*0.5)
+
+//Rueda Izquierda     PWM_OUT_7
+#define ADELANTE_IZQ            4100                //5000
+#define ATRAS_IZQ               3550                //2500
+#define PARADA_IZQ              3850
+#define V_MEDIA_IZQ     (PARADA_IZQ + (ADELANTE_IZQ - PARADA_IZQ)*0.5)
+
+
+//Sensores (Puerto B)
+#define SENSOR_CONTAC           GPIO_PIN_2
 #define ENCODER_IZQ             GPIO_PIN_3
 #define ENCODER_DRC             GPIO_PIN_4
+#define SENSOR_BAJO             GPIO_PIN_5
 
-
+//Estados de los motores
 #define PARADA              0
 #define AVANCE              1
-#define BUSCAR_REFERENCIA   2
-#define BUSCAR_OBJETO       3
-#define FUERA               4
-#define GIRO_DERECHA        5
-#define GIRO_IZQUIERDA      6
+#define BUSQUEDA            2
+#define FUERA               3
+#define AVANCE_OR           4
+#define CHOQUE              5
 
-
-#define CUATRO_CM           1570
-#define SEIS_CM             1191
-#define OCHO_CM             960
-#define DIEZ_CM             810
-#define DOCE_CM             740
-#define CATORCE_CM          650
-#define DIECISEIS_CM        580
-#define DIECIOCHO_CM        530
-#define VEINTE_CM           515
-#define VEINTIDOS_CM        475
-#define VEINTICUATRO_CM     430
-#define VEINTISEIS_CM       424
-#define VEINTIOCHO_CM       400
-#define TREINTA_CM          385
+//Estados del sensor de distancia
+#define SENSORM             7
+#define SENSORL             8
 
 
 
-void ConfigButtons(void){
+void Configuracion(void){
+
+    /*---------------------Configuracion de los botones de la placa-------------------*/
 
     ButtonsInit();
     GPIOIntClear(GPIO_PORTF_BASE,ALL_BUTTONS);
-    GPIOIntTypeSet(GPIO_PORTF_BASE, ALL_BUTTONS,GPIO_FALLING_EDGE);     //Interrupt de ambos por flanco de bajada
-    IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);     //Da prioridad a la interrup (5)
-    GPIOIntEnable(GPIO_PORTF_BASE,ALL_BUTTONS);                         //Habilitada la interrupt en ambos botones
-    IntEnable(INT_GPIOF);                                               //Habilita interruciones del puerto F
-
-}
-
-void ConfigEncSFrontal(void){
-
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-    GPIODirModeSet(GPIO_PORTB_BASE, SENSOR_FRONTAL|ENCODER_IZQ|ENCODER_DRC , GPIO_DIR_MODE_IN);    //Los ponemos como entrada
-
-    //Sensor Frontal
-    GPIOPadConfigSet(GPIO_PORTB_BASE,SENSOR_FRONTAL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);     //ponemos una resistencia de pull-up
-    GPIOIntTypeSet(GPIO_PORTB_BASE, SENSOR_FRONTAL, GPIO_FALLING_EDGE);                             //Int por flanco de bajada
-    GPIOIntEnable(GPIO_PORTB_BASE, SENSOR_FRONTAL);
-    GPIOIntClear(GPIO_PORTB_BASE, SENSOR_FRONTAL);
-
-    //Encoders
-    GPIOIntTypeSet(GPIO_PORTB_BASE, ENCODER_IZQ|ENCODER_DRC, GPIO_HIGH_LEVEL);                             //Int cuando tiene un nivel alto
-    GPIOIntEnable(GPIO_PORTB_BASE, ENCODER_IZQ|ENCODER_DRC);
-    GPIOIntClear(GPIO_PORTB_BASE, ENCODER_IZQ|ENCODER_DRC);
+    GPIOIntTypeSet(GPIO_PORTF_BASE, ALL_BUTTONS,GPIO_FALLING_EDGE);     // Interrupt de ambos por flanco de bajada
+    IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);     // Da prioridad a la interrup (5)
+    GPIOIntEnable(GPIO_PORTF_BASE,ALL_BUTTONS);                         // Habilitada la interrupt en ambos botones
+    IntEnable(INT_GPIOF);                                               // Habilita interruciones del puerto F
 
 
-    IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);
-    IntEnable(INT_GPIOB);
 
-}
+    /*---------------------Configuracion del Puerto B para sensores-------------------*/
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);                                            // Habilita el puerto B
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOB);                                       // Habilita el puerto B en bajo consumo
+    GPIODirModeSet(GPIO_PORTB_BASE, SENSOR_BAJO|SENSOR_CONTAC, GPIO_DIR_MODE_IN);           // Los ponemos como entrada
+    IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);                        // Da prioridad a la interrupcion
+    IntEnable(INT_GPIOB);                                                                   // Habilita la interrupcion
+
+    /*---------------------------Sensor de contacto-----------------------------------*/
+
+    GPIOPadConfigSet(GPIO_PORTB_BASE,SENSOR_CONTAC, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);     // Ponemos una resistencia de pull-up
+    GPIOIntTypeSet(GPIO_PORTB_BASE, SENSOR_CONTAC, GPIO_FALLING_EDGE);                             // Int por flanco de bajada
+    GPIOIntEnable(GPIO_PORTB_BASE, SENSOR_CONTAC);                                                 // Habilitar Int del pin
+    GPIOIntClear(GPIO_PORTB_BASE, SENSOR_CONTAC);                                                  // Limpia el flag de Int
+
+    /*----------------------------Sensor Bajo-----------------------------------------*/
+
+    GPIODirModeSet(GPIO_PORTB_BASE, SENSOR_BAJO, GPIO_DIR_MODE_IN);                             // Pone en pin como entrada
+    GPIOPadConfigSet(GPIO_PORTB_BASE, SENSOR_BAJO, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_OD);        //
+    GPIOIntTypeSet(GPIO_PORTB_BASE, SENSOR_BAJO, GPIO_FALLING_EDGE);                            // Int cuando tiene un nivel bajo
+    GPIOIntEnable(GPIO_PORTB_BASE, SENSOR_BAJO);                                                // Habilita la interrupcion en el pin
+    GPIOIntClear(GPIO_PORTB_BASE, SENSOR_BAJO);                                                 // Limpia flag de interrupcion del pin
+
+    /*-----------------------------Encoders-------------------------------------------*/
 
 
-void ConfigServos(void){
+    /*----------------------Configuracion de los servos-------------------------------*/
 
-    // Habilita puerto salida para señal PWM (ver en documentacion que pin se corresponde a cada módulo PWM)
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-    //Habilita modulo PWM
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM1);
-    // Establece divisor del reloj del sistema (40MHz/64=625KHz)
-    SysCtlPWMClockSet(SYSCTL_PWMDIV_64);
-    // Configura el pin PF2 como  PWM
-    GPIOPinConfigure(GPIO_PF2_M1PWM6);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);                    // Habilita puerto salida para señal PWM
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM1);                     // Habilita modulo PWM
+    SysCtlPWMClockSet(SYSCTL_PWMDIV_16);                            // Establece divisor del reloj del sistema (40MHz/16=2.5MHz)
+
+    GPIOPinConfigure(GPIO_PF2_M1PWM6);                              // Configura el pin PF2 como  PWM
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_2);
-    // Configura el pin PF2 como  PWM
-    GPIOPinConfigure(GPIO_PF3_M1PWM7);
+
+    GPIOPinConfigure(GPIO_PF3_M1PWM7);                              // Configura el pin PF3 como  PWM
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_3);
-    //Configura el modo de funcionamiento del PWM
-    PWMGenConfigure(PWM1_BASE, PWM_GEN_3, PWM_GEN_MODE_DOWN);   // Módulo PWM contara hacia abajo
-    PWMOutputState(PWM1_BASE, PWM_OUT_6_BIT, true);             // Habilita la salida de la señal
-    PWMOutputState(PWM1_BASE, PWM_OUT_7_BIT, true);             // Habilita la salida de la señal
-    PWMGenPeriodSet(PWM1_BASE, PWM_GEN_3, PERIOD_PWM);            // Carga la cuenta que establece la frecuencia de la señal PWM
-    PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, STOPCOUNT_DRC_MIN);
-    PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, STOPCOUNT_IZQ_MAX);
 
-    PWMGenEnable(PWM1_BASE, PWM_GEN_3);
+                                                                    // Configura el modo de funcionamiento del PWM
+    PWMGenConfigure(PWM1_BASE, PWM_GEN_3, PWM_GEN_MODE_DOWN);       // Módulo PWM contara hacia abajo
+    PWMOutputState(PWM1_BASE, PWM_OUT_6_BIT, true);                 // Habilita la salida de la señal
+    PWMOutputState(PWM1_BASE, PWM_OUT_7_BIT, true);                 // Habilita la salida de la señal
+    PWMGenPeriodSet(PWM1_BASE, PWM_GEN_3, PERIOD_PWM);              // Carga la cuenta que establece la frecuencia de la señal PWM
+
+    PWMPulseWidthSet(PWM1_BASE, PWM_OUT_6, PARADA_DRC);             // Carga valor al servo derecho
+    PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, PARADA_IZQ);             // Carga valor al servo izquierdo
+
+    PWMGenEnable(PWM1_BASE, PWM_GEN_3);                             // Habilita el generador PWM 3
+
+
+    /*-----------------------Configuracion Timer 0(ADC)----------------------------------*/
+
+    uint32_t ui32PeriodADC;
+
+     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);                  //Habilita periferico Timer0
+     TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);               //Configura el Timer0 para cuenta periodica de 32 bits
+     ui32PeriodADC = SysCtlClockGet()*0.1;                          //Periodo de cuenta de 0.1s.
+     TimerLoadSet(TIMER0_BASE, TIMER_A, ui32PeriodADC -1);          //Carga la cuenta en el Timer0A
+     IntEnable(INT_TIMER0A);                                        //Habilita interrupcion del modulo TIMER
+     TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);               //Habilita la interrupcion de "fin de cuenta"
+     IntMasterEnable();                                             //Habilita permiso general de interrupciones el sistema.
+//   TimerEnable(TIMER0_BASE, TIMER_A);                             //Activa el Timer0A (empezara a funcionar)
+     TimerDisable(TIMER0_BASE, TIMER_A);                            //Desabilita el Timer0A
+
+     /*---------------------Configuracion Timer2(????)----------------------------------*/
+
+     uint32_t ui32PeriodXX;
+
+      SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);                 // Habilita periferico Timer2
+      TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);              // Configura el Timer2 para cuenta periodica de 32 bits
+      ui32PeriodXX = SysCtlClockGet();                              // Periodo de cuenta de 1s.
+      TimerLoadSet(TIMER2_BASE, TIMER_A, ui32PeriodXX -1);          // Carga la cuenta en el Timer2A
+      IntEnable(INT_TIMER2A);                                       // Habilita interrupcion del modulo TIMER
+      TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);              // Habilita la interrupcion de "fin de cuenta"
+      IntMasterEnable();                                            // Habilita permiso general de interrupciones el sistema.
+//      TimerEnable(TIMER2_BASE, TIMER_A);                            // Activa el Timer2A (empezara a funcionar)
+      TimerDisable(TIMER2_BASE, TIMER_A);                           // Desabilita el Timer2A
+
 
 }
-
-void ConfigTimer(void){
-
-    uint32_t ui32Period;
-
-    // Habilita periferico Timer0
-     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
-     // Configura el Timer0 para cuenta periodica de 32 bits (no lo separa en TIMER0A y TIMER0B)
-     TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
-     // Periodo de cuenta de 1s.
-     ui32Period = SysCtlClockGet();
-     // Carga la cuenta en el Timer0A
-     TimerLoadSet(TIMER0_BASE, TIMER_A, ui32Period -1);
-     // Habilita interrupcion del modulo TIMER
-     IntEnable(INT_TIMER0A);
-     // Y habilita, dentro del modulo TIMER0, la interrupcion de particular de "fin de cuenta"
-     TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-     // Habilita permiso general de interrupciones el sistema.
-     IntMasterEnable();
-     // Activa el Timer0A (empezara a funcionar)
-     TimerEnable(TIMER0_BASE, TIMER_A);
-//     TimerDisable(TIMER0_BASE, TIMER_A);
-}
-
-
 
 
 
