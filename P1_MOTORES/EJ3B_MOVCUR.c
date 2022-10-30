@@ -140,7 +140,7 @@ void GPIOFIntHandler(void)
 
         ui32StatusPWM2 = PWMPulseWidthGet(PWM1_BASE, PWM_OUT_7);
 
-        if(ui32StatusPWM2 > ATRAS_IZQ){
+        if(ui32StatusPWM2 > PARADA_IZQ + CYCLE_INCREMENTS){
 
             PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7, ui32StatusPWM2 - CYCLE_INCREMENTS);
         }
