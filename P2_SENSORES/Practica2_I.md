@@ -2,7 +2,6 @@
 
 ## Ejercicio 1. Uso basico de sensores de contacto.
 
----
 
 Realizar un codigo donde, si en su movimiento, el sensor del robot choca con un obstáculo, se cambie el estado del LED y se modifique la trayectoria del robot –por ejemplo, hace retroceder un poco al robot y girar hacia un lado otro poco, para luego continuar su trayectoria rectilínea- . La detección en el puerto se debe realizar por interrupción
 
@@ -10,7 +9,6 @@ Realizar un codigo donde, si en su movimiento, el sensor del robot choca con un 
 
 ## Ejercicio 2. Aplicacion de respuesta a las lecturas del sensor. Tablas de *look-up*.
 
----
 
 Programa una aplicación para la placa TIVA conectada a un sensor de distancia tipo SHARP, establece 3 posibles intervalos activos equiespaciados de funcionamiento en el rango del sensor que hayas medido, y programa una aplicación que realice las siguientes acciones: 
 • Si se detecta una distancia en el primer intervalo activo [x1,x2]cm, se deberá encender el LED verde.
